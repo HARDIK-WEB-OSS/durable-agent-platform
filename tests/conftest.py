@@ -1,19 +1,61 @@
+import asyncio
 from collections.abc import AsyncIterator
+from pathlib import Path
 
 import pytest
-from sqlalchemy.ext.asyncio import AsyncEngine
+from alembic import command
+from alembic.config import Config
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
 
 from dap.config import Settings, get_settings
-from dap.db.session import make_engine
+from dap.db.models import Base
+from dap.db.session import make_engine, make_sessionmaker
+
+ROOT = Path(__file__).resolve().parents[1]
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def settings() -> Settings:
-    return get_settings()
+    base = get_settings()
+    return base.model_copy(update={"postgres_db": f"{base.postgres_db}_test"})
+
+
+async def ensure_database(settings: Settings) -> None:
+    admin = create_async_engine(
+        settings.model_copy(update={"postgres_db": "postgres"}).database_url,
+        isolation_level="AUTOCOMMIT",
+    )
+    async with admin.connect() as conn:
+        exists = await conn.scalar(
+            text("SELECT 1 FROM pg_database WHERE datname = :name"),
+            {"name": settings.postgres_db},
+        )
+        if not exists:
+            await conn.execute(text(f'CREATE DATABASE "{settings.postgres_db}"'))
+    await admin.dispose()
+
+
+@pytest.fixture(scope="session")
+def migrated_db(settings: Settings) -> None:
+    asyncio.run(ensure_database(settings))
+    cfg = Config(str(ROOT / "alembic.ini"))
+    cfg.set_main_option("script_location", str(ROOT / "migrations"))
+    cfg.attributes["database_url"] = settings.database_url
+    command.upgrade(cfg, "head")
 
 
 @pytest.fixture
-async def engine(settings: Settings) -> AsyncIterator[AsyncEngine]:
+async def engine(settings: Settings, migrated_db: None) -> AsyncIterator[AsyncEngine]:
     eng = make_engine(settings)
     yield eng
     await eng.dispose()
+
+
+@pytest.fixture
+async def session(engine: AsyncEngine) -> AsyncIterator[AsyncSession]:
+    tables = ", ".join(t.name for t in Base.metadata.sorted_tables)
+    async with engine.begin() as conn:
+        await conn.execute(text(f"TRUNCATE {tables} RESTART IDENTITY CASCADE"))
+    async with make_sessionmaker(engine)() as s:
+        yield s
