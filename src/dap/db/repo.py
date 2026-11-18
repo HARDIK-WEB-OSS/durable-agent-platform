@@ -1,24 +1,42 @@
 import uuid
 from collections.abc import Sequence
+from dataclasses import dataclass
+from datetime import datetime, timedelta
 from decimal import Decimal
-from typing import Any
+from typing import Any, NoReturn
 
-from sqlalchemy import func, select, update
+from sqlalchemy import ColumnElement, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from dap.db.models import Event, JsonDict, Run, Step
+from dap.db.models import Event, JsonDict, Run, Step, StepAttempt
 from dap.states import (
     RUN_TRANSITIONS,
     STEP_TRANSITIONS,
+    AttemptStatus,
     IllegalTransitionError,
     RunStatus,
     StepStatus,
     allowed_sources,
+    is_terminal,
 )
 
 
 class NotFoundError(Exception):
     pass
+
+
+class LeaseLostError(Exception):
+    pass
+
+
+@dataclass(frozen=True)
+class Fence:
+    owner: str
+    attempt: int
+
+
+def db_time_after(seconds: float) -> ColumnElement[datetime]:
+    return func.now() + timedelta(seconds=seconds)
 
 
 async def append_event(
@@ -76,6 +94,22 @@ async def transition_run(
     return run
 
 
+async def start_run_if_pending(session: AsyncSession, run_id: uuid.UUID) -> None:
+    status = await session.scalar(select(Run.status).where(Run.id == run_id))
+    if status == RunStatus.PENDING:
+        await transition_run(session, run_id, RunStatus.RUNNING)
+
+
+async def finish_run(
+    session: AsyncSession, run_id: uuid.UUID, target: RunStatus, **fields: Any
+) -> None:
+    status = await session.scalar(select(Run.status).where(Run.id == run_id))
+    if status is None:
+        raise NotFoundError(f"run {run_id}")
+    if not is_terminal(RUN_TRANSITIONS, status):
+        await transition_run(session, run_id, target, **fields)
+
+
 async def add_step(
     session: AsyncSession,
     run_id: uuid.UUID,
@@ -111,20 +145,80 @@ async def list_steps(session: AsyncSession, run_id: uuid.UUID) -> Sequence[Step]
 
 
 async def transition_step(
-    session: AsyncSession, step_id: uuid.UUID, target: StepStatus, **fields: Any
+    session: AsyncSession,
+    step_id: uuid.UUID,
+    target: StepStatus,
+    *,
+    fence: Fence | None = None,
+    event_payload: JsonDict | None = None,
+    **fields: Any,
 ) -> Step:
+    conditions = [Step.id == step_id, Step.status.in_(allowed_sources(STEP_TRANSITIONS, target))]
+    if fence is not None:
+        conditions += [Step.lease_owner == fence.owner, Step.attempts == fence.attempt]
     stmt = (
         update(Step)
-        .where(Step.id == step_id, Step.status.in_(allowed_sources(STEP_TRANSITIONS, target)))
+        .where(*conditions)
         .values(status=target, updated_at=func.now(), **fields)
         .returning(Step)
         .execution_options(populate_existing=True)
     )
     step = (await session.scalars(stmt)).one_or_none()
     if step is None:
-        current = await session.scalar(select(Step.status).where(Step.id == step_id))
-        if current is None:
-            raise NotFoundError(f"step {step_id}")
-        raise IllegalTransitionError(current, target)
-    await append_event(session, step.run_id, f"step.{target.value}", step_id=step_id)
+        await raise_step_rejection(session, step_id, target, fence)
+    await append_event(session, step.run_id, f"step.{target.value}", event_payload, step_id=step_id)
     return step
+
+
+async def raise_step_rejection(
+    session: AsyncSession, step_id: uuid.UUID, target: StepStatus, fence: Fence | None
+) -> NoReturn:
+    row = (
+        await session.execute(
+            select(Step.status, Step.lease_owner, Step.attempts).where(Step.id == step_id)
+        )
+    ).one_or_none()
+    if row is None:
+        raise NotFoundError(f"step {step_id}")
+    status, owner, attempts = row
+    if fence is not None and (owner, attempts) != (fence.owner, fence.attempt):
+        raise LeaseLostError(f"step {step_id} attempt {fence.attempt} by {fence.owner}")
+    raise IllegalTransitionError(status, target)
+
+
+async def start_attempt(
+    session: AsyncSession, step_id: uuid.UUID, attempt_no: int, worker_id: str
+) -> StepAttempt:
+    attempt = StepAttempt(
+        step_id=step_id,
+        attempt_no=attempt_no,
+        worker_id=worker_id,
+        status=AttemptStatus.RUNNING,
+    )
+    session.add(attempt)
+    await session.flush()
+    return attempt
+
+
+async def finish_attempt(
+    session: AsyncSession,
+    step_id: uuid.UUID,
+    attempt_no: int,
+    status: AttemptStatus,
+    error: str | None = None,
+) -> None:
+    await session.execute(
+        update(StepAttempt)
+        .where(
+            StepAttempt.step_id == step_id,
+            StepAttempt.attempt_no == attempt_no,
+            StepAttempt.status == AttemptStatus.RUNNING,
+        )
+        .values(status=status, error=error, finished_at=func.now())
+        .execution_options(synchronize_session=False)
+    )
+
+
+async def list_attempts(session: AsyncSession, step_id: uuid.UUID) -> Sequence[StepAttempt]:
+    stmt = select(StepAttempt).where(StepAttempt.step_id == step_id).order_by(StepAttempt.id)
+    return (await session.scalars(stmt)).all()

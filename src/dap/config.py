@@ -13,6 +13,11 @@ class Settings(BaseSettings):
     postgres_host: str = "localhost"
     postgres_port: int = 5434
 
+    worker_lease_seconds: float = 10.0
+    worker_poll_seconds: float = 0.5
+    retry_base_seconds: float = 0.5
+    retry_cap_seconds: float = 30.0
+
     @property
     def database_url(self) -> str:
         password = self.postgres_password.get_secret_value()

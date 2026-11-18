@@ -128,6 +128,18 @@ class IdempotencyKey(Base):
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
 
+class DemoSideEffect(Base):
+    # No unique constraint on purpose: duplicated side effects must stay detectable.
+    __tablename__ = "demo_side_effects"
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    run_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("runs.id"), index=True)
+    step_seq: Mapped[int] = mapped_column(Integer)
+    worker_id: Mapped[str] = mapped_column(String(128))
+    attempt: Mapped[int] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+
 class RouterDecision(Base):
     __tablename__ = "router_decisions"
 

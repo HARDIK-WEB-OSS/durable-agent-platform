@@ -6,7 +6,12 @@ import pytest
 from alembic import command
 from alembic.config import Config
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
+from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
 
 from dap.config import Settings, get_settings
 from dap.db.models import Base
@@ -53,9 +58,20 @@ async def engine(settings: Settings, migrated_db: None) -> AsyncIterator[AsyncEn
 
 
 @pytest.fixture
-async def session(engine: AsyncEngine) -> AsyncIterator[AsyncSession]:
+async def clean_db(engine: AsyncEngine) -> None:
     tables = ", ".join(t.name for t in Base.metadata.sorted_tables)
     async with engine.begin() as conn:
         await conn.execute(text(f"TRUNCATE {tables} RESTART IDENTITY CASCADE"))
-    async with make_sessionmaker(engine)() as s:
+
+
+@pytest.fixture
+def sessionmaker(engine: AsyncEngine, clean_db: None) -> async_sessionmaker[AsyncSession]:
+    return make_sessionmaker(engine)
+
+
+@pytest.fixture
+async def session(
+    sessionmaker: async_sessionmaker[AsyncSession],
+) -> AsyncIterator[AsyncSession]:
+    async with sessionmaker() as s:
         yield s
