@@ -1,0 +1,42 @@
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+build/
+dist/
+
+# Tool caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# ML artifacts and data
+mlruns/
+mlartifacts/
+data/
+models/
+*.pkl
+*.joblib
+*.npy
+*.parquet
+*.db
+*.sqlite
+*.dump
+*.sql.gz
+
+# Notebooks
+.ipynb_checkpoints/
+
+# Editors and OS
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store
