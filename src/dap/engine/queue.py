@@ -1,4 +1,3 @@
-import random
 import uuid
 from dataclasses import dataclass
 from typing import Any
@@ -7,9 +6,11 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from dap.db import repo
-from dap.db.models import JsonDict, Step
+from dap.db.models import JsonDict, Run, Step
 from dap.db.repo import Fence
 from dap.states import RunStatus, StepStatus
+
+LIVE_RUN_STATUSES = (RunStatus.PENDING, RunStatus.RUNNING)
 
 
 @dataclass(frozen=True)
@@ -28,19 +29,20 @@ class Claim:
         return Fence(self.worker_id, self.attempt)
 
 
-def backoff_seconds(attempt: int, base: float, cap: float, rng: random.Random) -> float:
-    return rng.uniform(0.0, min(cap, base * 2 ** (attempt - 1)))
-
-
 async def claim_next_step(
     session: AsyncSession, worker_id: str, lease_seconds: float
 ) -> Claim | None:
     stmt = (
         select(Step.id)
-        .where(Step.status == StepStatus.PENDING, Step.available_at <= func.now())
+        .join(Run, Run.id == Step.run_id)
+        .where(
+            Step.status == StepStatus.PENDING,
+            Step.available_at <= func.now(),
+            Run.status.in_(LIVE_RUN_STATUSES),
+        )
         .order_by(Step.available_at)
         .limit(1)
-        .with_for_update(skip_locked=True)
+        .with_for_update(of=Step, skip_locked=True)
     )
     step_id = await session.scalar(stmt)
     if step_id is None:

@@ -2,7 +2,7 @@ import random
 
 import pytest
 
-from dap.engine.queue import backoff_seconds
+from dap.backoff import backoff_seconds
 from dap.engine.runner import StepResult, StepSpec
 
 

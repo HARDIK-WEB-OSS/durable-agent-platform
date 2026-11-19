@@ -1,11 +1,14 @@
 from functools import lru_cache
+from typing import Literal
 
-from pydantic import SecretStr
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=".env", env_file_encoding="utf-8", extra="ignore", env_ignore_empty=True
+    )
 
     postgres_user: str = "dap"
     postgres_password: SecretStr
@@ -17,6 +20,24 @@ class Settings(BaseSettings):
     worker_poll_seconds: float = 0.5
     retry_base_seconds: float = 0.5
     retry_cap_seconds: float = 30.0
+
+    ollama_api_base: str = "http://localhost:11434"
+    local_num_ctx: int = 4096
+    cheap_model: str = "ollama_chat/qwen2.5:1.5b"
+    cheap_api_key: SecretStr | None = None
+    mid_model: str | None = "ollama_chat/qwen2.5:3b"
+    mid_api_key: SecretStr | None = None
+    # Hosted LiteLLM model string, e.g. "groq/<model>"; unset until a provider is chosen.
+    strong_model: str | None = None
+    strong_api_key: SecretStr | None = None
+    llm_hosted_rpm: float = Field(default=30.0, gt=0)
+    # Sent only to hosted models LiteLLM marks as reasoning models; hidden thinking tokens
+    # count toward max_tokens, so a low effort keeps room for the actual answer.
+    llm_reasoning_effort: Literal["low", "medium", "high"] | None = "low"
+    llm_timeout_seconds: float = 180.0
+    llm_max_retries: int = 2
+    llm_price_overrides: dict[str, tuple[float, float]] = {}
+    llm_shadow_anchor: str = "deepinfra/Qwen/Qwen2.5-7B-Instruct"
 
     @property
     def database_url(self) -> str:

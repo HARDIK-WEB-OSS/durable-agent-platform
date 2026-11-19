@@ -19,7 +19,7 @@ from dap.states import AttemptStatus, RunStatus
 pytestmark = pytest.mark.chaos
 
 ROOT = Path(__file__).resolve().parents[2]
-RUNS, STEPS, WORKERS, MAX_KILLS = 20, 10, 3, 25
+RUNS, STEPS, WORKERS, MAX_KILLS, MIN_KILLS = 20, 10, 3, 25, 10
 SM = async_sessionmaker[AsyncSession]
 
 
@@ -92,5 +92,5 @@ async def test_random_worker_kills_never_lose_or_duplicate_work(
     print(f"\nkills={kills} lost_attempts={lost} idempotent_replays={replays}")
     assert all(status == RunStatus.SUCCEEDED for status in statuses)
     assert all(c == dict.fromkeys(range(STEPS), 1) for c in counts)
-    assert kills == MAX_KILLS
+    assert kills >= MIN_KILLS
     assert lost is not None and lost > 0

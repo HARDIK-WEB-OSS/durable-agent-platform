@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from dap.db import repo
 from dap.db.models import DemoSideEffect, JsonDict, Run, Step
-from dap.engine import demo
+from dap.engine import demo, leases
 from dap.engine.idempotency import run_once
 from dap.engine.leases import heartbeat, reap_expired_leases, renew_lease
 from dap.engine.queue import Claim, claim_next_step
@@ -175,7 +175,7 @@ async def test_renew_lease_rejects_stale_owner(sessionmaker: SM) -> None:
 
 async def test_heartbeat_keeps_long_step_leased(sessionmaker: SM) -> None:
     run_id = await submit(sessionmaker, demo.chain_spec(1, sleep_s=1.0))
-    short_lease = EngineConfig(0.6, 0.05, 0.01, 0.05)
+    short_lease = EngineConfig(1.2, 0.05, 0.01, 0.05)
     await drive(sessionmaker, [run_id], workers=2, config=short_lease)
     [step] = await load_steps(sessionmaker, run_id)
     assert (step.status, step.attempts) == (StepStatus.SUCCEEDED, 1)
@@ -190,6 +190,29 @@ async def test_lease_lost_is_reported_to_heartbeat(sessionmaker: SM) -> None:
     async with asyncio.timeout(2):
         await heartbeat(sessionmaker, c, 0.3, lost.set)
     assert lost.is_set()
+
+
+@pytest.mark.parametrize("failure", ["error", "hang"])
+async def test_heartbeat_abandons_step_before_lease_expires_when_db_unreachable(
+    sessionmaker: SM, monkeypatch: pytest.MonkeyPatch, failure: str
+) -> None:
+    await submit(sessionmaker, demo.chain_spec(1))
+    c = await claim(sessionmaker, "a")
+
+    async def unreachable(*args: object, **kwargs: object) -> bool:
+        if failure == "hang":
+            await asyncio.sleep(60)
+        raise OSError("database unreachable")
+
+    monkeypatch.setattr(leases, "renew_lease", unreachable)
+    lease = 1.2
+    lost = asyncio.Event()
+    loop = asyncio.get_running_loop()
+    started = loop.time()
+    async with asyncio.timeout(5):
+        await heartbeat(sessionmaker, c, lease, lost.set)
+    assert lost.is_set()
+    assert loop.time() - started < lease
 
 
 async def test_reaper_requeues_expired_step_and_marks_attempt_lost(sessionmaker: SM) -> None:
@@ -212,6 +235,44 @@ async def test_reaper_dead_letters_when_attempts_exhausted(sessionmaker: SM) -> 
     [step] = await load_steps(sessionmaker, run_id)
     assert step.status == StepStatus.DEAD_LETTER
     assert (await load_run(sessionmaker, run_id)).status == RunStatus.FAILED
+
+
+async def test_reaped_step_waits_for_backoff_before_retry(sessionmaker: SM) -> None:
+    await submit(sessionmaker, demo.chain_spec(1))
+    await claim(sessionmaker, "a")
+    await expire_leases(sessionmaker)
+    async with sessionmaker.begin() as s:
+        assert await reap_expired_leases(s, lambda attempt: 60.0) == 1
+    async with sessionmaker.begin() as s:
+        assert await claim_next_step(s, "b", 5) is None
+
+
+async def test_concurrent_claims_in_one_pending_run_both_succeed(sessionmaker: SM) -> None:
+    async with sessionmaker.begin() as s:
+        run = await repo.create_run(s, "fan-out")
+        for _ in range(2):
+            await repo.add_step(s, run.id, "fake")
+
+    async def claim_and_hold(worker_id: str) -> Claim | None:
+        async with sessionmaker.begin() as s:
+            c = await claim_next_step(s, worker_id, 5)
+            await asyncio.sleep(0.3)
+        return c
+
+    first, second = await asyncio.gather(claim_and_hold("a"), claim_and_hold("b"))
+    assert first is not None and second is not None
+    assert first.step_id != second.step_id
+    async with sessionmaker() as s:
+        types = [e.type for e in await repo.list_events(s, run.id)]
+    assert types.count("run.running") == 1
+
+
+async def test_steps_of_cancelled_run_are_not_claimed(sessionmaker: SM) -> None:
+    run_id = await submit(sessionmaker, demo.chain_spec(1))
+    async with sessionmaker.begin() as s:
+        await repo.transition_run(s, run_id, RunStatus.CANCELLED)
+    async with sessionmaker.begin() as s:
+        assert await claim_next_step(s, "a", 5) is None
 
 
 async def test_zombie_worker_cannot_complete_reclaimed_step(sessionmaker: SM) -> None:

@@ -16,6 +16,7 @@ from typing import IO
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from dap.backoff import backoff_seconds
 from dap.config import get_settings
 from dap.db.session import make_engine, make_sessionmaker
 from dap.engine import demo
@@ -53,7 +54,7 @@ class Worker:
 
     async def tick(self) -> bool:
         async with self.sessionmaker.begin() as session:
-            await reap_expired_leases(session)
+            await reap_expired_leases(session, self.retry_delay)
         async with self.sessionmaker.begin() as session:
             claim = await claim_next_step(session, self.worker_id, self.config.lease_seconds)
         if claim is None:
@@ -63,6 +64,10 @@ class Worker:
         )
         await execute_claim(self.sessionmaker, claim, self.handlers, self.config, self.rng)
         return True
+
+    def retry_delay(self, attempt: int) -> float:
+        cfg = self.config
+        return backoff_seconds(attempt, cfg.retry_base_seconds, cfg.retry_cap_seconds, self.rng)
 
     async def idle(self) -> None:
         with contextlib.suppress(TimeoutError):

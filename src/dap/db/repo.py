@@ -74,9 +74,9 @@ async def get_run(session: AsyncSession, run_id: uuid.UUID) -> Run | None:
     return await session.get(Run, run_id)
 
 
-async def transition_run(
+async def try_transition_run(
     session: AsyncSession, run_id: uuid.UUID, target: RunStatus, **fields: Any
-) -> Run:
+) -> Run | None:
     stmt = (
         update(Run)
         .where(Run.id == run_id, Run.status.in_(allowed_sources(RUN_TRANSITIONS, target)))
@@ -85,29 +85,37 @@ async def transition_run(
         .execution_options(populate_existing=True)
     )
     run = (await session.scalars(stmt)).one_or_none()
+    if run is not None:
+        await append_event(session, run_id, f"run.{target.value}")
+    return run
+
+
+async def transition_run(
+    session: AsyncSession, run_id: uuid.UUID, target: RunStatus, **fields: Any
+) -> Run:
+    run = await try_transition_run(session, run_id, target, **fields)
     if run is None:
         current = await session.scalar(select(Run.status).where(Run.id == run_id))
         if current is None:
             raise NotFoundError(f"run {run_id}")
         raise IllegalTransitionError(current, target)
-    await append_event(session, run_id, f"run.{target.value}")
     return run
 
 
 async def start_run_if_pending(session: AsyncSession, run_id: uuid.UUID) -> None:
-    status = await session.scalar(select(Run.status).where(Run.id == run_id))
-    if status == RunStatus.PENDING:
-        await transition_run(session, run_id, RunStatus.RUNNING)
+    await try_transition_run(session, run_id, RunStatus.RUNNING)
 
 
 async def finish_run(
     session: AsyncSession, run_id: uuid.UUID, target: RunStatus, **fields: Any
 ) -> None:
+    if await try_transition_run(session, run_id, target, **fields) is not None:
+        return
     status = await session.scalar(select(Run.status).where(Run.id == run_id))
     if status is None:
         raise NotFoundError(f"run {run_id}")
     if not is_terminal(RUN_TRANSITIONS, status):
-        await transition_run(session, run_id, target, **fields)
+        raise IllegalTransitionError(status, target)
 
 
 async def add_step(

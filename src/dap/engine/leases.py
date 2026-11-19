@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import time
 from collections.abc import Callable
 
 from sqlalchemy import func, select, update
@@ -35,10 +36,24 @@ async def heartbeat(
     lease_seconds: float,
     on_lost: Callable[[], None],
 ) -> None:
+    """Renew the lease every lease/4 and give up before it can expire.
+
+    The local deadline is a lower bound on the DB-side expiry, because each renewal sets the
+    expiry from DB now(), which is no earlier than the moment the renewal was sent.
+    """
+    interval = lease_seconds / 4
+    margin = 1.5 * interval
+    deadline = time.monotonic() + lease_seconds
     while True:
-        await asyncio.sleep(lease_seconds / 3)
+        await asyncio.sleep(interval)
+        sent = time.monotonic()
+        budget = deadline - sent - margin
+        if budget <= 0:
+            log.error("could not renew lease on step %s in time; abandoning it", claim.step_id)
+            on_lost()
+            return
         try:
-            async with sessionmaker.begin() as session:
+            async with asyncio.timeout(budget), sessionmaker.begin() as session:
                 renewed = await renew_lease(session, claim, lease_seconds)
         except Exception:
             log.exception("heartbeat failed for step %s; will retry", claim.step_id)
@@ -46,9 +61,16 @@ async def heartbeat(
         if not renewed:
             on_lost()
             return
+        deadline = sent + lease_seconds
 
 
-async def reap_expired_leases(session: AsyncSession, batch: int = 10) -> int:
+def no_delay(attempt: int) -> float:
+    return 0.0
+
+
+async def reap_expired_leases(
+    session: AsyncSession, retry_delay: Callable[[int], float] = no_delay, batch: int = 10
+) -> int:
     stmt = (
         select(Step)
         .where(Step.status == StepStatus.RUNNING, Step.lease_expires_at < func.now())
@@ -68,6 +90,8 @@ async def reap_expired_leases(session: AsyncSession, batch: int = 10) -> int:
             worker_id=step.lease_owner or "",
         )
         await repo.finish_attempt(session, step.id, step.attempts, AttemptStatus.LOST)
-        await requeue_or_dead_letter(session, claim, "lease expired", delay_seconds=0.0)
+        await requeue_or_dead_letter(
+            session, claim, "lease expired", delay_seconds=retry_delay(claim.attempt)
+        )
         log.warning("reclaimed step %s seq=%s from %s", claim.step_id, claim.seq, claim.worker_id)
     return len(steps)

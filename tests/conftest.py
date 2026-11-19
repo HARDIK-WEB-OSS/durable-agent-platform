@@ -1,4 +1,5 @@
 import asyncio
+import os
 from collections.abc import AsyncIterator
 from pathlib import Path
 
@@ -18,6 +19,8 @@ from dap.db.models import Base
 from dap.db.session import make_engine, make_sessionmaker
 
 ROOT = Path(__file__).resolve().parents[1]
+os.environ.setdefault("LITELLM_LOCAL_MODEL_COST_MAP", "True")
+os.environ.setdefault("LITELLM_MODE", "PRODUCTION")  # test modules import litellm directly
 
 
 @pytest.fixture(scope="session")

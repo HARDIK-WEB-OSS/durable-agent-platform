@@ -1,8 +1,9 @@
 import itertools
 import uuid
+from typing import Any
 
 import pytest
-from sqlalchemy import delete, update
+from sqlalchemy import delete, text, update
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -117,3 +118,35 @@ async def test_events_are_append_only(session: AsyncSession) -> None:
         with pytest.raises(DBAPIError, match="append-only"):
             async with session.begin():
                 await session.execute(stmt)
+
+
+def changes(statuses: type[RunStatus] | type[StepStatus]) -> list[tuple[Any, Any]]:
+    return [(a, b) for a, b in itertools.product(statuses, repeat=2) if a != b]
+
+
+@pytest.mark.parametrize(("current", "target"), changes(RunStatus))
+async def test_db_trigger_enforces_run_transitions(
+    session: AsyncSession, current: RunStatus, target: RunStatus
+) -> None:
+    run = await run_in(session, current)
+    stmt = text("UPDATE runs SET status = :target WHERE id = :id")
+    params = {"target": target.value, "id": run.id}
+    if target in RUN_TRANSITIONS[current]:
+        await session.execute(stmt, params)
+    else:
+        with pytest.raises(DBAPIError, match="illegal runs transition"):
+            await session.execute(stmt, params)
+
+
+@pytest.mark.parametrize(("current", "target"), changes(StepStatus))
+async def test_db_trigger_enforces_step_transitions(
+    session: AsyncSession, current: StepStatus, target: StepStatus
+) -> None:
+    step = await step_in(session, current)
+    stmt = text("UPDATE steps SET status = :target WHERE id = :id")
+    params = {"target": target.value, "id": step.id}
+    if target in STEP_TRANSITIONS[current]:
+        await session.execute(stmt, params)
+    else:
+        with pytest.raises(DBAPIError, match="illegal steps transition"):
+            await session.execute(stmt, params)

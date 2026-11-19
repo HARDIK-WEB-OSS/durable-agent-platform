@@ -6,13 +6,14 @@ from dataclasses import dataclass, field
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from dap.backoff import backoff_seconds
 from dap.config import Settings
 from dap.db import repo
 from dap.db.models import JsonDict, Run
 from dap.db.repo import LeaseLostError
 from dap.engine.idempotency import Effect, run_once
 from dap.engine.leases import heartbeat
-from dap.engine.queue import Claim, backoff_seconds, requeue_or_dead_letter
+from dap.engine.queue import Claim, requeue_or_dead_letter
 from dap.states import AttemptStatus, RunStatus, StepStatus
 
 log = logging.getLogger(__name__)
@@ -104,6 +105,7 @@ async def execute_claim(
         return
     finally:
         beat.cancel()
+        await asyncio.gather(beat, return_exceptions=True)
     await record_success(sessionmaker, claim, result)
 
 
