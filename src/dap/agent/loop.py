@@ -102,10 +102,17 @@ async def submit_agent_run(
     sql_db: str | None = None,
     budget_usd: Decimal | None = None,
     max_turns: int | None = None,
+    tags: JsonDict | None = None,
 ) -> Run:
     if tools is not None and (unknown := set(tools) - set(TOOL_NAMES)):
         raise UnknownToolError(f"unknown tools {sorted(unknown)}")
-    run_input: JsonDict = {"arm": arm, "tools": tools, "sql_db": sql_db, "max_turns": max_turns}
+    run_input: JsonDict = {
+        **(tags or {}),
+        "arm": arm,
+        "tools": tools,
+        "sql_db": sql_db,
+        "max_turns": max_turns,
+    }
     run = await repo.create_run(session, task, run_input, budget_usd)
     await repo.add_step(session, run.id, THINK_KIND, {"arm": arm, "turn": 1}, STEP_MAX_ATTEMPTS)
     return run

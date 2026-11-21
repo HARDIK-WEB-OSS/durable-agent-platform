@@ -1,0 +1,1559 @@
+{
+ "version": 1,
+ "seed": 2026,
+ "per_dataset": 100,
+ "fractions": {
+  "train": 0.6,
+  "val": 0.2,
+  "test": 0.2
+ },
+ "created_at": "2026-11-21T11:27:18+00:00",
+ "sources": {
+  "gsm8k": {
+   "url": "https://raw.githubusercontent.com/openai/grade-school-math/master/grade_school_math/data/test.jsonl",
+   "license": "MIT",
+   "citation": "Cobbe et al. 2021, Training Verifiers to Solve Math Word Problems",
+   "file": "gsm8k/test.jsonl",
+   "sha256": "3730d312f6e3440559ace48831e51066acaca737f6eabec99bccb9e4b3c39d14"
+  },
+  "mbpp": {
+   "url": "https://raw.githubusercontent.com/google-research/google-research/master/mbpp/sanitized-mbpp.json",
+   "license": "CC BY 4.0",
+   "citation": "Austin et al. 2021, Program Synthesis with Large Language Models",
+   "file": "mbpp/sanitized-mbpp.json",
+   "sha256": "ca95deaa9a01ef0a6f439f88bcf0dd3db3563d22f22aad6cae04ebb9a8d8c8e9"
+  },
+  "spider": {
+   "url": "https://drive.google.com/file/d/1403EGqzIDoHMdQF4c9Bkyl7dZLZ5Wt6J (linked from https://yale-lily.github.io/spider)",
+   "license": "CC BY-SA 4.0",
+   "citation": "Yu et al. 2018, Spider: A Large-Scale Human-Labeled Dataset for Complex and Cross-Domain Semantic Parsing and Text-to-SQL Task",
+   "file": "spider/dev.json",
+   "sha256": "30d64a3fccde493226df79687aed9e4a1c0129525baf44f29c0573d914d758a4"
+  }
+ },
+ "sql_databases": {
+  "spider/battle_death.sqlite": "12569f4493a9655639c4ea86ba4bd8a4ea6411e1b8ae0e1fdf3d6a995344265d",
+  "spider/car_1.sqlite": "9d851e396e02997a1de073ae982fe1e4b1769fdffce2fac6e325857a3a938709",
+  "spider/concert_singer.sqlite": "4fa1ba5ab4577e895271088b1dc44aa94be88e25a54293317a67584112ef059d",
+  "spider/course_teach.sqlite": "da45fcdde64ac2b9330146506b7653ad4417489d8e496e509045e1b02245d793",
+  "spider/cre_Doc_Template_Mgt.sqlite": "9c3fdd03d8795ecde60aae782ce50c4fb1d6c03de1401fcdd6dc177342a53df5",
+  "spider/dog_kennels.sqlite": "ea5fbc6cf6aaf500371c5c121c339d9802ba6f5fbecd948a5274c0b487a9f486",
+  "spider/employee_hire_evaluation.sqlite": "760fec5cc872ef0cdf99242614f05c93dbd00d422ac9da87ea64fcf555be7373",
+  "spider/flight_2.sqlite": "db777ba6488ae2b515cb138d71ff23c4533e5fd0355854648a1102faff3fb7af",
+  "spider/network_1.sqlite": "bec92cd9a68d6f23469a0df246429299f44caaf75eab12275784e0bb7d0aa9ca",
+  "spider/orchestra.sqlite": "13b64af1cf6fcbd34953a44f951b2bf79bedc000b344549212dac1a9345e2f86",
+  "spider/pets_1.sqlite": "8ffe0ea9b3b034ca8860a2f18300a98c7583ce2522ea195726a04803f675e5bb",
+  "spider/poker_player.sqlite": "63fffd7b68524f07a742a74b74b95a4ba178e6419f3574b9ee78b8dda1df46ba",
+  "spider/singer.sqlite": "5c1b72755d148c294b26d7b479307e8799b93485ac918720f953e2ab84d59a0a",
+  "spider/student_transcripts_tracking.sqlite": "5a1f4928a1fd36f6edb31c4f054203b2e2fab6b18e5951c4f5633628f82a8e56",
+  "spider/tvshow.sqlite": "1212c2e75cf1dcf3aeb4055331a85298b073d8a613ead77975b13bd3346b9fc4",
+  "spider/world_1.sqlite": "17b986695f16786d58d66f85e49dba87bdfe72953207ab9b1b49da9d2301ef65",
+  "spider/wta_1.sqlite": "8f20747456d7748674b4f05432f3de96446ced95b8bd5a6fd01284f6c28f727c"
+ },
+ "filters": [
+  "every kept task's own gold answer must be graded correct by its grader (MBPP gold code passes its asserts in the sandbox; Spider gold SQL runs read-only)",
+  "spider: the gold query must return at least one row with a non-NULL value within the grading timeout, so an empty result cannot match by accident"
+ ],
+ "tasks": [
+  {
+   "id": "gsm8k:0",
+   "dataset": "gsm8k",
+   "split": "train"
+  },
+  {
+   "id": "gsm8k:30",
+   "dataset": "gsm8k",
+   "split": "train"
+  },
+  {
+   "id": "gsm8k:92",
+   "dataset": "gsm8k",
+   "split": "val"
+  },
+  {
+   "id": "gsm8k:101",
+   "dataset": "gsm8k",
+   "split": "train"
+  },
+  {
+   "id": "gsm8k:124",
+   "dataset": "gsm8k",
+   "split": "train"
+  },
+  {
+   "id": "gsm8k:129",
+   "dataset": "gsm8k",
+   "split": "train"
+  },
+  {
+   "id": "gsm8k:152",
+   "dataset": "gsm8k",
+   "split": "val"
+  },
+  {
+   "id": "gsm8k:163",
+   "dataset": "gsm8k",
+   "split": "train"
+  },
+  {
+   "id": "gsm8k:167",
+   "dataset": "gsm8k",
+   "split": "test"
+  },
+  {
+   "id": "gsm8k:172",
+   "dataset": "gsm8k",
+   "split": "train"
+  },
+  {
+   "id": "gsm8k:174",
+   "dataset": "gsm8k",
+   "split": "val"
+  },
+  {
+   "id": "gsm8k:193",
+   "dataset": "gsm8k",
+   "split": "test"
+  },
+  {
+   "id": "gsm8k:217",
+   "dataset": "gsm8k",
+   "split": "val"
+  },
+  {
+   "id": "gsm8k:236",
+   "dataset": "gsm8k",
+   "split": "train"
+  },
+  {
+   "id": "gsm8k:239",
+   "dataset": "gsm8k",
+   "split": "train"
+  },
+  {
+   "id": "gsm8k:269",
+   "dataset": "gsm8k",
+   "split": "train"
+  },
+  {
+   "id": "gsm8k:299",
+   "dataset": "gsm8k",
+   "split": "test"
+  },
+  {
+   "id": "gsm8k:343",
+   "dataset": "gsm8k",
+   "split": "train"
+  },
+  {
+   "id": "gsm8k:350",
+   "dataset": "gsm8k",
+   "split": "train"
+  },
+  {
+   "id": "gsm8k:352",
+   "dataset": "gsm8k",
+   "split": "train"
+  },
+  {
+   "id": "gsm8k:358",
+   "dataset": "gsm8k",
+   "split": "train"
+  },
+  {
+   "id": "gsm8k:362",
+   "dataset": "gsm8k",
+   "split": "train"
+  },
+  {
+   "id": "gsm8k:375",
+   "dataset": "gsm8k",
+   "split": "test"
+  },
+  {
+   "id": "gsm8k:389",
+   "dataset": "gsm8k",
+   "split": "test"
+  },
+  {
+   "id": "gsm8k:409",
+   "dataset": "gsm8k",
+   "split": "train"
+  },
+  {
+   "id": "gsm8k:419",
+   "dataset": "gsm8k",
+   "split": "train"
+  },
+  {
+   "id": "gsm8k:420",
+   "dataset": "gsm8k",
+   "split": "train"
+  },
+  {
+   "id": "gsm8k:453",
+   "dataset": "gsm8k",
+   "split": "train"
+  },
+  {
+   "id": "gsm8k:454",
+   "dataset": "gsm8k",
+   "split": "train"
+  },
+  {
+   "id": "gsm8k:460",
+   "dataset": "gsm8k",
+   "split": "train"
+  },
+  {
+   "id": "gsm8k:500",
+   "dataset": "gsm8k",
+   "split": "train"
+  },
+  {
+   "id": "gsm8k:503",
+   "dataset": "gsm8k",
+   "split": "train"
+  },
+  {
+   "id": "gsm8k:506",
+   "dataset": "gsm8k",
+   "split": "test"
+  },
+  {
+   "id": "gsm8k:514",
+   "dataset": "gsm8k",
+   "split": "test"
+  },
+  {
+   "id": "gsm8k:547",
+   "dataset": "gsm8k",
+   "split": "val"
+  },
+  {
+   "id": "gsm8k:584",
+   "dataset": "gsm8k",
+   "split": "train"
+  },
+  {
+   "id": "gsm8k:608",
+   "dataset": "gsm8k",
+   "split": "train"
+  },
+  {
+   "id": "gsm8k:633",
+   "dataset": "gsm8k",
+   "split": "train"
+  },
+  {
+   "id": "gsm8k:659",
+   "dataset": "gsm8k",
+   "split": "train"
+  },
+  {
+   "id": "gsm8k:686",
+   "dataset": "gsm8k",
+   "split": "train"
+  },
+  {
+   "id": "gsm8k:694",
+   "dataset": "gsm8k",
+   "split": "val"
+  },
+  {
+   "id": "gsm8k:713",
+   "dataset": "gsm8k",
+   "split": "val"
+  },
+  {
+   "id": "gsm8k:718",
+   "dataset": "gsm8k",
+   "split": "train"
+  },
+  {
+   "id": "gsm8k:722",
+   "dataset": "gsm8k",
+   "split": "train"
+  },
+  {
+   "id": "gsm8k:744",
+   "dataset": "gsm8k",
+   "split": "test"
+  },
+  {
+   "id": "gsm8k:745",
+   "dataset": "gsm8k",
+   "split": "train"
+  },
+  {
+   "id": "gsm8k:757",
+   "dataset": "gsm8k",
+   "split": "test"
+  },
+  {
+   "id": "gsm8k:758",
+   "dataset": "gsm8k",
+   "split": "train"
+  },
+  {
+   "id": "gsm8k:777",
+   "dataset": "gsm8k",
+   "split": "train"
+  },
+  {
+   "id": "gsm8k:784",
+   "dataset": "gsm8k",
+   "split": "train"
+  },
+  {
+   "id": "gsm8k:796",
+   "dataset": "gsm8k",
+   "split": "train"
+  },
+  {
+   "id": "gsm8k:826",
+   "dataset": "gsm8k",
+   "split": "train"
+  },
+  {
+   "id": "gsm8k:828",
+   "dataset": "gsm8k",
+   "split": "train"
+  },
+  {
+   "id": "gsm8k:830",
+   "dataset": "gsm8k",
+   "split": "train"
+  },
+  {
+   "id": "gsm8k:832",
+   "dataset": "gsm8k",
+   "split": "train"
+  },
+  {
+   "id": "gsm8k:836",
+   "dataset": "gsm8k",
+   "split": "test"
+  },
+  {
+   "id": "gsm8k:839",
+   "dataset": "gsm8k",
+   "split": "test"
+  },
+  {
+   "id": "gsm8k:848",
+   "dataset": "gsm8k",
+   "split": "val"
+  },
+  {
+   "id": "gsm8k:855",
+   "dataset": "gsm8k",
+   "split": "test"
+  },
+  {
+   "id": "gsm8k:866",
+   "dataset": "gsm8k",
+   "split": "train"
+  },
+  {
+   "id": "gsm8k:879",
+   "dataset": "gsm8k",
+   "split": "train"
+  },
+  {
+   "id": "gsm8k:888",
+   "dataset": "gsm8k",
+   "split": "train"
+  },
+  {
+   "id": "gsm8k:914",
+   "dataset": "gsm8k",
+   "split": "train"
+  },
+  {
+   "id": "gsm8k:920",
+   "dataset": "gsm8k",
+   "split": "val"
+  },
+  {
+   "id": "gsm8k:933",
+   "dataset": "gsm8k",
+   "split": "train"
+  },
+  {
+   "id": "gsm8k:939",
+   "dataset": "gsm8k",
+   "split": "val"
+  },
+  {
+   "id": "gsm8k:945",
+   "dataset": "gsm8k",
+   "split": "train"
+  },
+  {
+   "id": "gsm8k:954",
+   "dataset": "gsm8k",
+   "split": "train"
+  },
+  {
+   "id": "gsm8k:968",
+   "dataset": "gsm8k",
+   "split": "val"
+  },
+  {
+   "id": "gsm8k:970",
+   "dataset": "gsm8k",
+   "split": "train"
+  },
+  {
+   "id": "gsm8k:971",
+   "dataset": "gsm8k",
+   "split": "train"
+  },
+  {
+   "id": "gsm8k:978",
+   "dataset": "gsm8k",
+   "split": "val"
+  },
+  {
+   "id": "gsm8k:990",
+   "dataset": "gsm8k",
+   "split": "train"
+  },
+  {
+   "id": "gsm8k:1000",
+   "dataset": "gsm8k",
+   "split": "test"
+  },
+  {
+   "id": "gsm8k:1007",
+   "dataset": "gsm8k",
+   "split": "train"
+  },
+  {
+   "id": "gsm8k:1018",
+   "dataset": "gsm8k",
+   "split": "val"
+  },
+  {
+   "id": "gsm8k:1032",
+   "dataset": "gsm8k",
+   "split": "test"
+  },
+  {
+   "id": "gsm8k:1036",
+   "dataset": "gsm8k",
+   "split": "val"
+  },
+  {
+   "id": "gsm8k:1044",
+   "dataset": "gsm8k",
+   "split": "train"
+  },
+  {
+   "id": "gsm8k:1070",
+   "dataset": "gsm8k",
+   "split": "train"
+  },
+  {
+   "id": "gsm8k:1072",
+   "dataset": "gsm8k",
+   "split": "train"
+  },
+  {
+   "id": "gsm8k:1081",
+   "dataset": "gsm8k",
+   "split": "test"
+  },
+  {
+   "id": "gsm8k:1084",
+   "dataset": "gsm8k",
+   "split": "val"
+  },
+  {
+   "id": "gsm8k:1117",
+   "dataset": "gsm8k",
+   "split": "val"
+  },
+  {
+   "id": "gsm8k:1122",
+   "dataset": "gsm8k",
+   "split": "val"
+  },
+  {
+   "id": "gsm8k:1127",
+   "dataset": "gsm8k",
+   "split": "test"
+  },
+  {
+   "id": "gsm8k:1130",
+   "dataset": "gsm8k",
+   "split": "train"
+  },
+  {
+   "id": "gsm8k:1132",
+   "dataset": "gsm8k",
+   "split": "test"
+  },
+  {
+   "id": "gsm8k:1134",
+   "dataset": "gsm8k",
+   "split": "train"
+  },
+  {
+   "id": "gsm8k:1145",
+   "dataset": "gsm8k",
+   "split": "val"
+  },
+  {
+   "id": "gsm8k:1151",
+   "dataset": "gsm8k",
+   "split": "train"
+  },
+  {
+   "id": "gsm8k:1194",
+   "dataset": "gsm8k",
+   "split": "test"
+  },
+  {
+   "id": "gsm8k:1204",
+   "dataset": "gsm8k",
+   "split": "test"
+  },
+  {
+   "id": "gsm8k:1205",
+   "dataset": "gsm8k",
+   "split": "train"
+  },
+  {
+   "id": "gsm8k:1213",
+   "dataset": "gsm8k",
+   "split": "val"
+  },
+  {
+   "id": "gsm8k:1216",
+   "dataset": "gsm8k",
+   "split": "train"
+  },
+  {
+   "id": "gsm8k:1260",
+   "dataset": "gsm8k",
+   "split": "train"
+  },
+  {
+   "id": "gsm8k:1263",
+   "dataset": "gsm8k",
+   "split": "test"
+  },
+  {
+   "id": "gsm8k:1264",
+   "dataset": "gsm8k",
+   "split": "val"
+  },
+  {
+   "id": "gsm8k:1307",
+   "dataset": "gsm8k",
+   "split": "train"
+  },
+  {
+   "id": "mbpp:7",
+   "dataset": "mbpp",
+   "split": "test"
+  },
+  {
+   "id": "mbpp:9",
+   "dataset": "mbpp",
+   "split": "train"
+  },
+  {
+   "id": "mbpp:59",
+   "dataset": "mbpp",
+   "split": "train"
+  },
+  {
+   "id": "mbpp:61",
+   "dataset": "mbpp",
+   "split": "test"
+  },
+  {
+   "id": "mbpp:63",
+   "dataset": "mbpp",
+   "split": "test"
+  },
+  {
+   "id": "mbpp:69",
+   "dataset": "mbpp",
+   "split": "train"
+  },
+  {
+   "id": "mbpp:79",
+   "dataset": "mbpp",
+   "split": "test"
+  },
+  {
+   "id": "mbpp:82",
+   "dataset": "mbpp",
+   "split": "train"
+  },
+  {
+   "id": "mbpp:85",
+   "dataset": "mbpp",
+   "split": "val"
+  },
+  {
+   "id": "mbpp:93",
+   "dataset": "mbpp",
+   "split": "train"
+  },
+  {
+   "id": "mbpp:94",
+   "dataset": "mbpp",
+   "split": "test"
+  },
+  {
+   "id": "mbpp:97",
+   "dataset": "mbpp",
+   "split": "train"
+  },
+  {
+   "id": "mbpp:98",
+   "dataset": "mbpp",
+   "split": "val"
+  },
+  {
+   "id": "mbpp:120",
+   "dataset": "mbpp",
+   "split": "train"
+  },
+  {
+   "id": "mbpp:131",
+   "dataset": "mbpp",
+   "split": "train"
+  },
+  {
+   "id": "mbpp:133",
+   "dataset": "mbpp",
+   "split": "train"
+  },
+  {
+   "id": "mbpp:163",
+   "dataset": "mbpp",
+   "split": "train"
+  },
+  {
+   "id": "mbpp:167",
+   "dataset": "mbpp",
+   "split": "test"
+  },
+  {
+   "id": "mbpp:170",
+   "dataset": "mbpp",
+   "split": "val"
+  },
+  {
+   "id": "mbpp:171",
+   "dataset": "mbpp",
+   "split": "train"
+  },
+  {
+   "id": "mbpp:223",
+   "dataset": "mbpp",
+   "split": "train"
+  },
+  {
+   "id": "mbpp:235",
+   "dataset": "mbpp",
+   "split": "test"
+  },
+  {
+   "id": "mbpp:237",
+   "dataset": "mbpp",
+   "split": "train"
+  },
+  {
+   "id": "mbpp:240",
+   "dataset": "mbpp",
+   "split": "test"
+  },
+  {
+   "id": "mbpp:242",
+   "dataset": "mbpp",
+   "split": "test"
+  },
+  {
+   "id": "mbpp:248",
+   "dataset": "mbpp",
+   "split": "val"
+  },
+  {
+   "id": "mbpp:249",
+   "dataset": "mbpp",
+   "split": "train"
+  },
+  {
+   "id": "mbpp:250",
+   "dataset": "mbpp",
+   "split": "train"
+  },
+  {
+   "id": "mbpp:251",
+   "dataset": "mbpp",
+   "split": "train"
+  },
+  {
+   "id": "mbpp:253",
+   "dataset": "mbpp",
+   "split": "train"
+  },
+  {
+   "id": "mbpp:256",
+   "dataset": "mbpp",
+   "split": "train"
+  },
+  {
+   "id": "mbpp:264",
+   "dataset": "mbpp",
+   "split": "val"
+  },
+  {
+   "id": "mbpp:270",
+   "dataset": "mbpp",
+   "split": "train"
+  },
+  {
+   "id": "mbpp:271",
+   "dataset": "mbpp",
+   "split": "test"
+  },
+  {
+   "id": "mbpp:282",
+   "dataset": "mbpp",
+   "split": "test"
+  },
+  {
+   "id": "mbpp:283",
+   "dataset": "mbpp",
+   "split": "train"
+  },
+  {
+   "id": "mbpp:292",
+   "dataset": "mbpp",
+   "split": "val"
+  },
+  {
+   "id": "mbpp:297",
+   "dataset": "mbpp",
+   "split": "train"
+  },
+  {
+   "id": "mbpp:308",
+   "dataset": "mbpp",
+   "split": "test"
+  },
+  {
+   "id": "mbpp:312",
+   "dataset": "mbpp",
+   "split": "test"
+  },
+  {
+   "id": "mbpp:388",
+   "dataset": "mbpp",
+   "split": "val"
+  },
+  {
+   "id": "mbpp:398",
+   "dataset": "mbpp",
+   "split": "train"
+  },
+  {
+   "id": "mbpp:400",
+   "dataset": "mbpp",
+   "split": "test"
+  },
+  {
+   "id": "mbpp:406",
+   "dataset": "mbpp",
+   "split": "train"
+  },
+  {
+   "id": "mbpp:407",
+   "dataset": "mbpp",
+   "split": "train"
+  },
+  {
+   "id": "mbpp:414",
+   "dataset": "mbpp",
+   "split": "train"
+  },
+  {
+   "id": "mbpp:430",
+   "dataset": "mbpp",
+   "split": "train"
+  },
+  {
+   "id": "mbpp:433",
+   "dataset": "mbpp",
+   "split": "train"
+  },
+  {
+   "id": "mbpp:440",
+   "dataset": "mbpp",
+   "split": "val"
+  },
+  {
+   "id": "mbpp:446",
+   "dataset": "mbpp",
+   "split": "val"
+  },
+  {
+   "id": "mbpp:452",
+   "dataset": "mbpp",
+   "split": "val"
+  },
+  {
+   "id": "mbpp:457",
+   "dataset": "mbpp",
+   "split": "train"
+  },
+  {
+   "id": "mbpp:470",
+   "dataset": "mbpp",
+   "split": "train"
+  },
+  {
+   "id": "mbpp:474",
+   "dataset": "mbpp",
+   "split": "train"
+  },
+  {
+   "id": "mbpp:477",
+   "dataset": "mbpp",
+   "split": "train"
+  },
+  {
+   "id": "mbpp:554",
+   "dataset": "mbpp",
+   "split": "train"
+  },
+  {
+   "id": "mbpp:556",
+   "dataset": "mbpp",
+   "split": "train"
+  },
+  {
+   "id": "mbpp:557",
+   "dataset": "mbpp",
+   "split": "test"
+  },
+  {
+   "id": "mbpp:559",
+   "dataset": "mbpp",
+   "split": "val"
+  },
+  {
+   "id": "mbpp:562",
+   "dataset": "mbpp",
+   "split": "val"
+  },
+  {
+   "id": "mbpp:566",
+   "dataset": "mbpp",
+   "split": "train"
+  },
+  {
+   "id": "mbpp:567",
+   "dataset": "mbpp",
+   "split": "train"
+  },
+  {
+   "id": "mbpp:568",
+   "dataset": "mbpp",
+   "split": "test"
+  },
+  {
+   "id": "mbpp:569",
+   "dataset": "mbpp",
+   "split": "train"
+  },
+  {
+   "id": "mbpp:572",
+   "dataset": "mbpp",
+   "split": "train"
+  },
+  {
+   "id": "mbpp:579",
+   "dataset": "mbpp",
+   "split": "val"
+  },
+  {
+   "id": "mbpp:580",
+   "dataset": "mbpp",
+   "split": "train"
+  },
+  {
+   "id": "mbpp:581",
+   "dataset": "mbpp",
+   "split": "val"
+  },
+  {
+   "id": "mbpp:586",
+   "dataset": "mbpp",
+   "split": "train"
+  },
+  {
+   "id": "mbpp:591",
+   "dataset": "mbpp",
+   "split": "val"
+  },
+  {
+   "id": "mbpp:594",
+   "dataset": "mbpp",
+   "split": "val"
+  },
+  {
+   "id": "mbpp:596",
+   "dataset": "mbpp",
+   "split": "test"
+  },
+  {
+   "id": "mbpp:599",
+   "dataset": "mbpp",
+   "split": "train"
+  },
+  {
+   "id": "mbpp:610",
+   "dataset": "mbpp",
+   "split": "train"
+  },
+  {
+   "id": "mbpp:624",
+   "dataset": "mbpp",
+   "split": "train"
+  },
+  {
+   "id": "mbpp:625",
+   "dataset": "mbpp",
+   "split": "train"
+  },
+  {
+   "id": "mbpp:627",
+   "dataset": "mbpp",
+   "split": "train"
+  },
+  {
+   "id": "mbpp:628",
+   "dataset": "mbpp",
+   "split": "train"
+  },
+  {
+   "id": "mbpp:631",
+   "dataset": "mbpp",
+   "split": "val"
+  },
+  {
+   "id": "mbpp:633",
+   "dataset": "mbpp",
+   "split": "train"
+  },
+  {
+   "id": "mbpp:641",
+   "dataset": "mbpp",
+   "split": "train"
+  },
+  {
+   "id": "mbpp:643",
+   "dataset": "mbpp",
+   "split": "train"
+  },
+  {
+   "id": "mbpp:731",
+   "dataset": "mbpp",
+   "split": "test"
+  },
+  {
+   "id": "mbpp:734",
+   "dataset": "mbpp",
+   "split": "train"
+  },
+  {
+   "id": "mbpp:737",
+   "dataset": "mbpp",
+   "split": "val"
+  },
+  {
+   "id": "mbpp:738",
+   "dataset": "mbpp",
+   "split": "train"
+  },
+  {
+   "id": "mbpp:739",
+   "dataset": "mbpp",
+   "split": "train"
+  },
+  {
+   "id": "mbpp:745",
+   "dataset": "mbpp",
+   "split": "train"
+  },
+  {
+   "id": "mbpp:746",
+   "dataset": "mbpp",
+   "split": "test"
+  },
+  {
+   "id": "mbpp:747",
+   "dataset": "mbpp",
+   "split": "train"
+  },
+  {
+   "id": "mbpp:748",
+   "dataset": "mbpp",
+   "split": "train"
+  },
+  {
+   "id": "mbpp:749",
+   "dataset": "mbpp",
+   "split": "val"
+  },
+  {
+   "id": "mbpp:759",
+   "dataset": "mbpp",
+   "split": "test"
+  },
+  {
+   "id": "mbpp:760",
+   "dataset": "mbpp",
+   "split": "train"
+  },
+  {
+   "id": "mbpp:776",
+   "dataset": "mbpp",
+   "split": "val"
+  },
+  {
+   "id": "mbpp:785",
+   "dataset": "mbpp",
+   "split": "train"
+  },
+  {
+   "id": "mbpp:787",
+   "dataset": "mbpp",
+   "split": "train"
+  },
+  {
+   "id": "mbpp:793",
+   "dataset": "mbpp",
+   "split": "train"
+  },
+  {
+   "id": "mbpp:806",
+   "dataset": "mbpp",
+   "split": "train"
+  },
+  {
+   "id": "mbpp:807",
+   "dataset": "mbpp",
+   "split": "train"
+  },
+  {
+   "id": "spider:6",
+   "dataset": "spider",
+   "split": "train"
+  },
+  {
+   "id": "spider:9",
+   "dataset": "spider",
+   "split": "val"
+  },
+  {
+   "id": "spider:17",
+   "dataset": "spider",
+   "split": "val"
+  },
+  {
+   "id": "spider:23",
+   "dataset": "spider",
+   "split": "train"
+  },
+  {
+   "id": "spider:31",
+   "dataset": "spider",
+   "split": "train"
+  },
+  {
+   "id": "spider:32",
+   "dataset": "spider",
+   "split": "train"
+  },
+  {
+   "id": "spider:36",
+   "dataset": "spider",
+   "split": "train"
+  },
+  {
+   "id": "spider:52",
+   "dataset": "spider",
+   "split": "train"
+  },
+  {
+   "id": "spider:65",
+   "dataset": "spider",
+   "split": "test"
+  },
+  {
+   "id": "spider:85",
+   "dataset": "spider",
+   "split": "val"
+  },
+  {
+   "id": "spider:88",
+   "dataset": "spider",
+   "split": "train"
+  },
+  {
+   "id": "spider:94",
+   "dataset": "spider",
+   "split": "test"
+  },
+  {
+   "id": "spider:103",
+   "dataset": "spider",
+   "split": "train"
+  },
+  {
+   "id": "spider:104",
+   "dataset": "spider",
+   "split": "test"
+  },
+  {
+   "id": "spider:112",
+   "dataset": "spider",
+   "split": "test"
+  },
+  {
+   "id": "spider:120",
+   "dataset": "spider",
+   "split": "test"
+  },
+  {
+   "id": "spider:124",
+   "dataset": "spider",
+   "split": "val"
+  },
+  {
+   "id": "spider:127",
+   "dataset": "spider",
+   "split": "test"
+  },
+  {
+   "id": "spider:135",
+   "dataset": "spider",
+   "split": "test"
+  },
+  {
+   "id": "spider:136",
+   "dataset": "spider",
+   "split": "train"
+  },
+  {
+   "id": "spider:140",
+   "dataset": "spider",
+   "split": "val"
+  },
+  {
+   "id": "spider:191",
+   "dataset": "spider",
+   "split": "train"
+  },
+  {
+   "id": "spider:209",
+   "dataset": "spider",
+   "split": "train"
+  },
+  {
+   "id": "spider:216",
+   "dataset": "spider",
+   "split": "val"
+  },
+  {
+   "id": "spider:229",
+   "dataset": "spider",
+   "split": "train"
+  },
+  {
+   "id": "spider:255",
+   "dataset": "spider",
+   "split": "train"
+  },
+  {
+   "id": "spider:260",
+   "dataset": "spider",
+   "split": "train"
+  },
+  {
+   "id": "spider:297",
+   "dataset": "spider",
+   "split": "test"
+  },
+  {
+   "id": "spider:306",
+   "dataset": "spider",
+   "split": "val"
+  },
+  {
+   "id": "spider:310",
+   "dataset": "spider",
+   "split": "test"
+  },
+  {
+   "id": "spider:316",
+   "dataset": "spider",
+   "split": "train"
+  },
+  {
+   "id": "spider:331",
+   "dataset": "spider",
+   "split": "val"
+  },
+  {
+   "id": "spider:338",
+   "dataset": "spider",
+   "split": "train"
+  },
+  {
+   "id": "spider:355",
+   "dataset": "spider",
+   "split": "train"
+  },
+  {
+   "id": "spider:400",
+   "dataset": "spider",
+   "split": "test"
+  },
+  {
+   "id": "spider:406",
+   "dataset": "spider",
+   "split": "val"
+  },
+  {
+   "id": "spider:408",
+   "dataset": "spider",
+   "split": "train"
+  },
+  {
+   "id": "spider:432",
+   "dataset": "spider",
+   "split": "val"
+  },
+  {
+   "id": "spider:449",
+   "dataset": "spider",
+   "split": "val"
+  },
+  {
+   "id": "spider:454",
+   "dataset": "spider",
+   "split": "val"
+  },
+  {
+   "id": "spider:468",
+   "dataset": "spider",
+   "split": "train"
+  },
+  {
+   "id": "spider:485",
+   "dataset": "spider",
+   "split": "test"
+  },
+  {
+   "id": "spider:490",
+   "dataset": "spider",
+   "split": "train"
+  },
+  {
+   "id": "spider:491",
+   "dataset": "spider",
+   "split": "train"
+  },
+  {
+   "id": "spider:512",
+   "dataset": "spider",
+   "split": "train"
+  },
+  {
+   "id": "spider:515",
+   "dataset": "spider",
+   "split": "test"
+  },
+  {
+   "id": "spider:527",
+   "dataset": "spider",
+   "split": "test"
+  },
+  {
+   "id": "spider:528",
+   "dataset": "spider",
+   "split": "train"
+  },
+  {
+   "id": "spider:532",
+   "dataset": "spider",
+   "split": "train"
+  },
+  {
+   "id": "spider:540",
+   "dataset": "spider",
+   "split": "val"
+  },
+  {
+   "id": "spider:546",
+   "dataset": "spider",
+   "split": "train"
+  },
+  {
+   "id": "spider:568",
+   "dataset": "spider",
+   "split": "train"
+  },
+  {
+   "id": "spider:569",
+   "dataset": "spider",
+   "split": "train"
+  },
+  {
+   "id": "spider:595",
+   "dataset": "spider",
+   "split": "train"
+  },
+  {
+   "id": "spider:610",
+   "dataset": "spider",
+   "split": "train"
+  },
+  {
+   "id": "spider:617",
+   "dataset": "spider",
+   "split": "train"
+  },
+  {
+   "id": "spider:628",
+   "dataset": "spider",
+   "split": "train"
+  },
+  {
+   "id": "spider:629",
+   "dataset": "spider",
+   "split": "train"
+  },
+  {
+   "id": "spider:639",
+   "dataset": "spider",
+   "split": "test"
+  },
+  {
+   "id": "spider:640",
+   "dataset": "spider",
+   "split": "train"
+  },
+  {
+   "id": "spider:659",
+   "dataset": "spider",
+   "split": "test"
+  },
+  {
+   "id": "spider:671",
+   "dataset": "spider",
+   "split": "train"
+  },
+  {
+   "id": "spider:678",
+   "dataset": "spider",
+   "split": "train"
+  },
+  {
+   "id": "spider:709",
+   "dataset": "spider",
+   "split": "train"
+  },
+  {
+   "id": "spider:729",
+   "dataset": "spider",
+   "split": "test"
+  },
+  {
+   "id": "spider:730",
+   "dataset": "spider",
+   "split": "train"
+  },
+  {
+   "id": "spider:732",
+   "dataset": "spider",
+   "split": "val"
+  },
+  {
+   "id": "spider:745",
+   "dataset": "spider",
+   "split": "train"
+  },
+  {
+   "id": "spider:746",
+   "dataset": "spider",
+   "split": "train"
+  },
+  {
+   "id": "spider:772",
+   "dataset": "spider",
+   "split": "test"
+  },
+  {
+   "id": "spider:774",
+   "dataset": "spider",
+   "split": "train"
+  },
+  {
+   "id": "spider:779",
+   "dataset": "spider",
+   "split": "train"
+  },
+  {
+   "id": "spider:788",
+   "dataset": "spider",
+   "split": "train"
+  },
+  {
+   "id": "spider:800",
+   "dataset": "spider",
+   "split": "train"
+  },
+  {
+   "id": "spider:817",
+   "dataset": "spider",
+   "split": "train"
+  },
+  {
+   "id": "spider:819",
+   "dataset": "spider",
+   "split": "train"
+  },
+  {
+   "id": "spider:821",
+   "dataset": "spider",
+   "split": "val"
+  },
+  {
+   "id": "spider:831",
+   "dataset": "spider",
+   "split": "train"
+  },
+  {
+   "id": "spider:834",
+   "dataset": "spider",
+   "split": "val"
+  },
+  {
+   "id": "spider:836",
+   "dataset": "spider",
+   "split": "val"
+  },
+  {
+   "id": "spider:846",
+   "dataset": "spider",
+   "split": "train"
+  },
+  {
+   "id": "spider:849",
+   "dataset": "spider",
+   "split": "train"
+  },
+  {
+   "id": "spider:871",
+   "dataset": "spider",
+   "split": "train"
+  },
+  {
+   "id": "spider:874",
+   "dataset": "spider",
+   "split": "test"
+  },
+  {
+   "id": "spider:876",
+   "dataset": "spider",
+   "split": "train"
+  },
+  {
+   "id": "spider:892",
+   "dataset": "spider",
+   "split": "train"
+  },
+  {
+   "id": "spider:924",
+   "dataset": "spider",
+   "split": "train"
+  },
+  {
+   "id": "spider:926",
+   "dataset": "spider",
+   "split": "train"
+  },
+  {
+   "id": "spider:933",
+   "dataset": "spider",
+   "split": "test"
+  },
+  {
+   "id": "spider:951",
+   "dataset": "spider",
+   "split": "train"
+  },
+  {
+   "id": "spider:955",
+   "dataset": "spider",
+   "split": "train"
+  },
+  {
+   "id": "spider:960",
+   "dataset": "spider",
+   "split": "train"
+  },
+  {
+   "id": "spider:961",
+   "dataset": "spider",
+   "split": "test"
+  },
+  {
+   "id": "spider:967",
+   "dataset": "spider",
+   "split": "val"
+  },
+  {
+   "id": "spider:972",
+   "dataset": "spider",
+   "split": "train"
+  },
+  {
+   "id": "spider:979",
+   "dataset": "spider",
+   "split": "train"
+  },
+  {
+   "id": "spider:981",
+   "dataset": "spider",
+   "split": "val"
+  },
+  {
+   "id": "spider:985",
+   "dataset": "spider",
+   "split": "train"
+  },
+  {
+   "id": "spider:1027",
+   "dataset": "spider",
+   "split": "train"
+  },
+  {
+   "id": "spider:1028",
+   "dataset": "spider",
+   "split": "val"
+  }
+ ]
+}

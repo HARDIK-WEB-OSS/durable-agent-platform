@@ -13,6 +13,7 @@ timeout kills the container by name, not just the docker CLI process. Output is 
 it is read, so a print loop cannot fill host memory.
 """
 
+import ast
 import asyncio
 import contextlib
 import uuid
@@ -184,6 +185,35 @@ class DockerSandbox:
         return proc.returncode or 0, out.decode(errors="replace")
 
 
+def echo_last_expression(code: str) -> str:
+    """Notebook-style: if the script ends with a bare expression, also print its repr.
+
+    Small models often end with `total` instead of `print(total)` and then see "(no output)".
+    Only the agent's tool does this; graders run submitted code exactly as written. Code that
+    does not parse is returned unchanged, so the model sees the real SyntaxError.
+    """
+    try:
+        tree = ast.parse(code)
+    except SyntaxError:
+        return code
+    if not tree.body or not isinstance(tree.body[-1], ast.Expr):
+        return code
+    last = tree.body[-1]
+    lines = code.splitlines(keepends=True)
+    prefix = "".join(lines[: last.lineno - 1])
+    line = lines[last.lineno - 1].encode()
+    prefix += line[: last.col_offset].decode()
+    expression = ast.get_source_segment(code, last)
+    if expression is None:
+        return code
+    return (
+        f"{prefix.rstrip().rstrip(';')}\n"
+        f"__dap_last = ({expression})\n"
+        "if __dap_last is not None:\n"
+        "    print(repr(__dap_last))\n"
+    )
+
+
 @dataclass(frozen=True)
 class PythonExecTool:
     sandbox: DockerSandbox
@@ -194,12 +224,12 @@ class PythonExecTool:
         return (
             "Run a Python 3.11 script (standard library only, no network, no files except "
             f"/tmp, {self.sandbox.timeout_s:g} s limit). tool_input: the full script. "
-            "Use print() to show results; only printed output is returned."
+            "Use print() to show results; the value of a final bare expression is also shown."
         )
 
     async def run(self, tool_input: str) -> str:
-        result = await self.sandbox.run(tool_input)
-        parts = [result.output.rstrip() or "(no output)"]
+        result = await self.sandbox.run(echo_last_expression(tool_input))
+        parts = [result.output.rstrip() or "(no output: use print() to show values)"]
         if result.output_truncated:
             parts.append(f"[output cut at {self.sandbox.max_output_bytes} bytes]")
         if result.timed_out:

@@ -53,31 +53,43 @@ class SqlQueryTool:
     async def run(self, tool_input: str) -> str:
         return await asyncio.to_thread(self.query, tool_input)
 
-    def connect(self) -> sqlite3.Connection:
-        uri = f"{self.database.resolve().as_uri()}?mode=ro"
-        conn = sqlite3.connect(uri, uri=True, timeout=self.timeout_s)
-        conn.execute("PRAGMA query_only = ON")
-        conn.set_authorizer(allow_reads_only)
-        return conn
-
     def query(self, sql: str) -> str:
-        deadline = time.monotonic() + self.timeout_s
-        conn = self.connect()
-        try:
-            conn.set_progress_handler(lambda: int(time.monotonic() > deadline), PROGRESS_EVERY_OPS)
-            try:
-                cursor = conn.execute(sql)
-                rows = cursor.fetchmany(self.max_rows + 1)
-            except sqlite3.OperationalError as exc:
-                if time.monotonic() > deadline:
-                    raise ToolError(f"query took longer than {self.timeout_s:g} s") from exc
-                raise ToolError(f"SQLite error: {exc}") from exc
-            except (sqlite3.Error, sqlite3.Warning) as exc:
-                raise ToolError(f"SQLite error: {exc}") from exc
-            columns = [d[0] for d in cursor.description or []]
-        finally:
-            conn.close()
+        columns, rows = read_only_query(self.database, sql, self.timeout_s, self.max_rows + 1)
         return format_rows(columns, rows, self.max_rows)
+
+
+Row = tuple[object, ...]
+
+
+def connect_read_only(database: Path, timeout_s: float) -> sqlite3.Connection:
+    uri = f"{database.resolve().as_uri()}?mode=ro"
+    conn = sqlite3.connect(uri, uri=True, timeout=timeout_s)
+    conn.execute("PRAGMA query_only = ON")
+    conn.set_authorizer(allow_reads_only)
+    return conn
+
+
+def read_only_query(
+    database: Path, sql: str, timeout_s: float, max_rows: int
+) -> tuple[list[str], list[Row]]:
+    """Run one statement under every read-only protection; used by the tool and the grader."""
+    deadline = time.monotonic() + timeout_s
+    conn = connect_read_only(database, timeout_s)
+    try:
+        conn.set_progress_handler(lambda: int(time.monotonic() > deadline), PROGRESS_EVERY_OPS)
+        try:
+            cursor = conn.execute(sql)
+            rows = cursor.fetchmany(max_rows)
+        except sqlite3.OperationalError as exc:
+            if time.monotonic() > deadline:
+                raise ToolError(f"query took longer than {timeout_s:g} s") from exc
+            raise ToolError(f"SQLite error: {exc}") from exc
+        except (sqlite3.Error, sqlite3.Warning) as exc:
+            raise ToolError(f"SQLite error: {exc}") from exc
+        columns = [d[0] for d in cursor.description or []]
+    finally:
+        conn.close()
+    return columns, rows
 
 
 def format_rows(columns: list[str], rows: list[tuple[object, ...]], max_rows: int) -> str:

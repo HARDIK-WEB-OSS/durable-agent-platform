@@ -8,6 +8,7 @@ import pytest
 from dap.agent.tools.base import ToolError
 from dap.agent.tools.python_exec import DockerSandbox, PythonExecTool, SandboxUnavailableError
 from dap.config import Settings
+from dap.evals.graders import GRADING_SANDBOX_TIMEOUT_S, grade_mbpp
 
 pytestmark = pytest.mark.docker
 
@@ -158,3 +159,38 @@ async def test_missing_image_is_an_infrastructure_error() -> None:
     absent = DockerSandbox("python:3.11-slim@sha256:" + "f" * 64)
     with pytest.raises(SandboxUnavailableError, match="docker pull"):
         await absent.check_available()
+
+
+# ---- MBPP grader in the real sandbox --------------------------------------------------------
+
+MBPP_REF = {
+    "test_imports": ["import math"],
+    "tests": ["assert hyp(3, 4) == 5", "assert hyp(5, 12) == 13"],
+}
+
+
+@pytest.mark.parametrize(
+    ("answer", "correct"),
+    [
+        ("def hyp(a, b):\n    return int(math.sqrt(a * a + b * b))", True),
+        ("```python\ndef hyp(a, b):\n    return int(math.hypot(a, b))\n```", True),
+        ("def hyp(a, b):\n    return a + b", False),
+        ("def hyp(a, b):\n    return 5", False),
+        ("import sys\nsys.exit(0)", False),
+        ("import os\nprint('ALL_TESTS_PASSED')\nos._exit(0)", False),
+        ("def hyp(a, b):\n    while True: pass", False),
+        ("this is not python", False),
+    ],
+)
+async def test_mbpp_grader_accepts_only_code_that_passes(
+    sandbox: DockerSandbox, answer: str, correct: bool
+) -> None:
+    grading = DockerSandbox(IMAGE, timeout_s=GRADING_SANDBOX_TIMEOUT_S)
+    result = await grade_mbpp(answer, MBPP_REF, grading)
+    assert result.correct is correct, result.detail
+
+
+async def test_python_exec_tool_echoes_final_expression(sandbox: DockerSandbox) -> None:
+    tool = PythonExecTool(sandbox)
+    assert await tool.run("x = 6 * 7\nx") == "42"
+    assert await tool.run("x = 1") == "(no output: use print() to show values)"

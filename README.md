@@ -169,3 +169,78 @@ uv run python scripts/agent_demo.py "What is 17 * 23 + 4?" --arm mid --tools cal
 `nomic-embed-text` is used with its task prefixes: `search_document: ` when documents are
 ingested and `search_query: ` for queries. `agent_demo.py` refuses hosted (paid) arms unless
 you pass `--allow-paid`.
+
+## Benchmark tasks
+
+300 tasks, 100 from each of three public datasets, chosen once with seed 2026 and split 60/20/20
+into train, val and test within each dataset:
+
+| Dataset | Source | Licence | Tools the agent gets | Grader |
+|---|---|---|---|---|
+| GSM8K (test) | [openai/grade-school-math](https://github.com/openai/grade-school-math) | MIT | `calculator`, `python_exec` | exact numeric match of the last number in the answer |
+| MBPP (sanitized) | [google-research/mbpp](https://github.com/google-research/google-research/tree/master/mbpp) | CC BY 4.0 | `python_exec` | the answer's code plus the dataset's asserts run in the Docker sandbox |
+| Spider 1.0 (dev) | [yale-lily.github.io/spider](https://yale-lily.github.io/spider) | CC BY-SA 4.0 | `sql_query` | execution match: predicted and gold SQL run read-only, results compared |
+
+**No LLM grades anything.** Details:
+
+- The MBPP grader prints a random per-run marker after the asserts, so code that exits early or
+  prints a fake "passed" line fails.
+- Spider results are compared as multisets, or as lists when the gold query has `ORDER BY`. The
+  column order may differ, and floats are compared to 6 decimals.
+- A task was kept only if its own gold answer passes its grader. 3 Spider questions whose gold
+  query returns nothing were skipped, so an empty result can't match by accident.
+
+The split is stored in `src/dap/evals/tasks/split_v1.json`, which is committed. It holds task ids,
+splits, the seed, and each source file's URL, licence and SHA-256 hash. The raw data is not
+committed. Loading refuses to run if a raw file's hash differs, and the seed script refuses to
+overwrite the manifest.
+
+**The test split is reserved for the final benchmark.** The harness refuses it unless you pass
+`--final-test`.
+
+Known limitation: Spider databases are shared across splits (the split is by question), so the
+router sees test-time databases during training.
+
+### Setup
+
+```powershell
+# raw files go in data/raw (git-ignored)
+New-Item -ItemType Directory -Force data\raw\gsm8k, data\raw\mbpp | Out-Null
+Invoke-WebRequest "https://raw.githubusercontent.com/openai/grade-school-math/master/grade_school_math/data/test.jsonl" -OutFile data\raw\gsm8k\test.jsonl
+Invoke-WebRequest "https://raw.githubusercontent.com/google-research/google-research/master/mbpp/sanitized-mbpp.json" -OutFile data\raw\mbpp\sanitized-mbpp.json
+# Spider: download the dataset zip from https://yale-lily.github.io/spider and put
+# dev.json, tables.json and database/<db>/<db>.sqlite under data\raw\spider
+```
+
+Then copy the Spider databases into `SQL_DATA_DIR`. The split is not regenerated; it already
+exists:
+
+```powershell
+uv run python -c "from pathlib import Path; from dap.evals.split import install_spider_databases as i; i(Path('data/raw'), Path('data/sql'))"
+```
+
+### Running the evaluation
+
+```powershell
+uv run python scripts/run_eval.py --arms mid --limit 2               # smoke test, 2 tasks per dataset
+uv run python scripts/run_eval.py --arms cheap mid                   # train + val on the local arms
+uv run python scripts/run_eval.py --arms strong --allow-paid         # hosted arm
+uv run python scripts/run_eval.py --arms strong --allow-paid --retry-errors
+uv run python scripts/run_eval.py --summary
+```
+
+Results go to the `eval_results` table, one row per (task, arm), including tokens, paid and
+shadow cost, LLM and tool time, and turns. You can stop and restart at any time:
+- finished pairs are skipped
+- runs still in flight are resumed (they are durable)
+- infrastructure failures, such as a provider's daily limit, are recorded as `error`, not as
+  wrong answers; they are left out of accuracy and retried with `--retry-errors`
+
+An arm stops taking new tasks after 5 errors in a row.
+
+Keep `--concurrency 1` for local arms: Ollama answers one request at a time, so queueing inside
+it would be counted as model latency.
+
+`python_exec` echoes the value of a script's final bare expression, as a notebook does. Small
+models often end with `total` instead of `print(total)`. Only the agent's tool does this; graders
+run submitted code exactly as written.

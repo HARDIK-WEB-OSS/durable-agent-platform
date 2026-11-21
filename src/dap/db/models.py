@@ -170,6 +170,36 @@ class Document(Base):
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
 
+class EvalResult(Base):
+    """One graded (task, arm) outcome of an evaluation; the router's training data."""
+
+    __tablename__ = "eval_results"
+    __table_args__ = (UniqueConstraint("eval_name", "task_id", "arm"),)
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    eval_name: Mapped[str] = mapped_column(String(64))
+    task_id: Mapped[str] = mapped_column(String(64))
+    dataset: Mapped[str] = mapped_column(String(16))
+    split: Mapped[str] = mapped_column(String(8))
+    arm: Mapped[str] = mapped_column(String(16))
+    run_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("runs.id"))
+    outcome: Mapped[str] = mapped_column(String(16))  # correct | incorrect | error
+    answer: Mapped[str | None] = mapped_column(Text)
+    detail: Mapped[str] = mapped_column(Text)
+    paid_usd: Mapped[float] = mapped_column(Float)
+    shadow_usd: Mapped[float] = mapped_column(Float)
+    tokens_in: Mapped[int] = mapped_column(Integer)
+    tokens_out: Mapped[int] = mapped_column(Integer)
+    llm_calls: Mapped[int] = mapped_column(Integer)
+    tool_calls: Mapped[int] = mapped_column(Integer)
+    turns: Mapped[int | None] = mapped_column(Integer)
+    llm_s: Mapped[float] = mapped_column(Float)
+    tool_s: Mapped[float] = mapped_column(Float)
+    elapsed_s: Mapped[float | None] = mapped_column(Float)
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+
 class RouterDecision(Base):
     __tablename__ = "router_decisions"
 

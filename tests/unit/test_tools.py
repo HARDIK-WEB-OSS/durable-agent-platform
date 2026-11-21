@@ -6,7 +6,7 @@ import pytest
 from dap.agent.tools import ToolBox, UnknownToolError
 from dap.agent.tools.base import ToolError, truncate
 from dap.agent.tools.calculator import CalculatorTool, evaluate
-from dap.agent.tools.python_exec import DockerSandbox, PythonExecTool
+from dap.agent.tools.python_exec import DockerSandbox, PythonExecTool, echo_last_expression
 from dap.agent.tools.sql_query import SqlQueryTool, resolve_database
 
 IMAGE = "python:3.11-slim@sha256:" + "0" * 64
@@ -193,3 +193,38 @@ def test_sandbox_command_has_every_hardening_flag() -> None:
 def test_python_exec_description_states_limits() -> None:
     text = PythonExecTool(DockerSandbox(IMAGE, timeout_s=7)).description
     assert "no network" in text and "7 s" in text
+
+
+# ---- python_exec: notebook-style echo of a final expression --------------------------------
+
+
+def run_locally(code: str) -> str:
+    import contextlib
+    import io
+
+    out = io.StringIO()
+    with contextlib.redirect_stdout(out):
+        exec(echo_last_expression(code), {})  # test inputs only
+    return out.getvalue()
+
+
+@pytest.mark.parametrize(
+    ("code", "printed"),
+    [
+        ("x = 6 * 7\nx", "42\n"),
+        ("a = 1; b = 2; a + b", "3\n"),
+        ("x = 'hi'\nx", "'hi'\n"),
+        ("total = sum(\n    [1, 2, 3]\n)\ntotal * 2", "12\n"),
+        ("print(5)", "5\n"),
+        ("x = 5", ""),
+        ("def f():\n    return 1\nf()", "1\n"),
+        ("for i in range(2):\n    print(i)", "0\n1\n"),
+        ("[].append(1)", ""),
+    ],
+)
+def test_final_expression_is_echoed(code: str, printed: str) -> None:
+    assert run_locally(code) == printed
+
+
+def test_unparseable_code_is_left_alone() -> None:
+    assert echo_last_expression("def broken(:") == "def broken(:"
