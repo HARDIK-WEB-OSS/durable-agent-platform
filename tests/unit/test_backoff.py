@@ -25,6 +25,18 @@ def test_backoff_is_capped() -> None:
     assert max(backoff_seconds(50, 0.5, 30.0, rng) for _ in range(500)) <= 30.0
 
 
-def test_step_result_rejects_next_step_and_final_result_together() -> None:
-    with pytest.raises(ValueError, match="either"):
-        StepResult({}, next_step=StepSpec("x"), run_result={"done": True})
+@pytest.mark.parametrize(
+    "endings",
+    [
+        {"next_step": StepSpec("x"), "run_result": {"done": True}},
+        {"next_step": StepSpec("x"), "run_error": "stopped"},
+        {"run_result": {"done": True}, "run_error": "stopped"},
+    ],
+)
+def test_step_result_allows_only_one_way_to_end(endings: dict[str, object]) -> None:
+    with pytest.raises(ValueError, match="next step, finishes the run, or fails it"):
+        StepResult({}, **endings)  # type: ignore[arg-type]
+
+
+def test_step_result_can_fail_the_run() -> None:
+    assert StepResult({}, run_error="stopped").run_error == "stopped"

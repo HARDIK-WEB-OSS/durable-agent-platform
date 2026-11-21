@@ -76,3 +76,96 @@ Each arm is asked a small math question twice (`cold`, then `warm`) and must rep
 schema-valid JSON. Before any call, the script prints the hosted arm's price per 1M tokens and a
 worst-case cost for the run. Without `--allow-paid` the hosted arm is not called and is reported
 as `NOT RUN`. The script exits 0 only when all three arms pass.
+
+## Agent
+
+`src/dap/agent/` runs a ReAct-style agent on the durable engine. **Each LLM call and each tool
+call is its own step**:
+
+```
+agent.think (turn 1) -> agent.act (turn 1) -> agent.think (turn 2) -> ... -> final_answer
+```
+
+The model replies with one JSON object, `{"thought", "tool", "tool_input"}`. The transcript is
+never stored as a whole; it is rebuilt from the outputs of the run's committed steps, so a step
+retried on another worker sees exactly the history committed before it.
+
+### What survives a crash
+
+| Effect | Guarantee | How |
+|---|---|---|
+| Writes to our own tables (`ctx.once`) | exactly once | effect and idempotency key commit in one transaction |
+| LLM calls and tool runs (`ctx.external`) | at least once, **recorded once** | result is stored under an idempotency key; a retried step reuses it |
+
+An LLM call or tool run repeats only if the worker dies in the gap between the call returning
+and its result committing. While an external call runs, no DB connection or transaction is
+held (review F02). Every real LLM call is logged as an `llm.call` event, including one that a
+crash forces us to repeat, so cost totals stay honest.
+
+### Limits
+
+Checked before every LLM turn. Hitting one fails the run, with the reason as its error:
+
+- `AGENT_MAX_STEPS` turns (a run can override this with `max_turns`)
+- `AGENT_TIMEOUT_SECONDS` of wall-clock time since the run was created
+- the run's `budget_usd`, compared with the paid cost of its `llm.call` events (a turn already
+  in flight can overshoot by one call)
+- the local model's context window: a transcript that no longer fits stops the run instead of
+  being silently cut
+
+### Tools
+
+| Tool | Input | Safety |
+|---|---|---|
+| `calculator` | arithmetic expression | parsed with `ast`; only numbers, operators and a fixed list of math functions; exponent and result size capped |
+| `python_exec` | Python script | hardened Docker container (see below) |
+| `sql_query` | one SQLite `SELECT` | file opened `mode=ro` + `PRAGMA query_only` + an authorizer that allows only reads (no ATTACH, PRAGMA or DDL); one statement; 5 s timeout; 50-row cap; the file must be inside `SQL_DATA_DIR` |
+| `search_docs` | search query | pgvector cosine search over `documents`; results are wrapped as `<document>` data |
+
+**Prompt injection.** Tool output reaches the model inside an `<observation>` block marked as
+data, and the system prompt tells the model never to follow instructions found there. A
+document cannot close the block early. This lowers the risk; it does not remove it, because
+small models do not always obey. The real protection is that no tool can change anything
+outside its sandbox: SQL is read-only and Python has no network.
+
+### python_exec sandbox
+
+Each call runs in a fresh container that is thrown away afterwards:
+
+```
+docker run --rm -i --network none --read-only --tmpfs /tmp:rw,nosuid,nodev,size=64m
+  --memory 256m --memory-swap 256m --cpus 1 --pids-limit 64 --cap-drop ALL
+  --security-opt no-new-privileges --user 65534:65534
+  python:3.11-slim@sha256:07d48240...  python -I -
+```
+
+The code goes in on stdin, so nothing from the host is mounted. A wall-clock timeout
+(`SANDBOX_TIMEOUT_SECONDS`) removes the container by name, not just the `docker` process.
+Output is capped while it is being read. The image is pinned by digest, and the worker refuses
+to start if the image is missing. `tests/integration/test_sandbox.py` runs the real container
+and proves that:
+
+- network access fails
+- writing outside `/tmp` fails
+- the process runs as uid 65534 with no capabilities
+- the timeout kills the container
+- the memory and process limits hold
+- runaway output is cut off
+
+**Hosts without Docker** (for example the deployed demo): set `PYTHON_EXEC_ENABLED=false`.
+`python_exec` is then not offered to the model at all, and tasks that need it will do worse or
+fail. Say so wherever results from that host are shown.
+
+### Setup and demo
+
+```powershell
+docker pull python:3.11-slim@sha256:07d4824036af339fa1b6ef769cc99d9c10a141769538b52b3b597c84f7a7b535
+ollama pull nomic-embed-text
+uv run alembic upgrade head
+uv run python scripts/ingest_docs.py README.md
+uv run python scripts/agent_demo.py "What is 17 * 23 + 4?" --arm mid --tools calculator
+```
+
+`nomic-embed-text` is used with its task prefixes: `search_document: ` when documents are
+ingested and `search_query: ` for queries. `agent_demo.py` refuses hosted (paid) arms unless
+you pass `--allow-paid`.

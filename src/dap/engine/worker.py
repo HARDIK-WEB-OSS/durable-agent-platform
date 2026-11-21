@@ -16,6 +16,7 @@ from typing import IO
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from dap.agent.loop import build_runtime
 from dap.backoff import backoff_seconds
 from dap.config import get_settings
 from dap.db.session import make_engine, make_sessionmaker
@@ -91,10 +92,12 @@ def install_stop_handlers(stop: asyncio.Event) -> None:
 async def serve(worker_id: str) -> None:
     settings = get_settings()
     engine = make_engine(settings)
+    sessionmaker = make_sessionmaker(engine)
+    agent = await build_runtime(settings, sessionmaker)
     worker = Worker(
         worker_id=worker_id,
-        sessionmaker=make_sessionmaker(engine),
-        handlers=default_handlers(),
+        sessionmaker=sessionmaker,
+        handlers={**default_handlers(), **agent.handlers()},
         config=EngineConfig.from_settings(settings),
     )
     install_stop_handlers(worker.stop)

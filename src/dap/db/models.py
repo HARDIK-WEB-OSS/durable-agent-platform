@@ -21,6 +21,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.types import UserDefinedType
 
 from dap.states import AttemptStatus, RunStatus, StepStatus
 
@@ -137,6 +138,35 @@ class DemoSideEffect(Base):
     step_seq: Mapped[int] = mapped_column(Integer)
     worker_id: Mapped[str] = mapped_column(String(128))
     attempt: Mapped[int] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+
+class Vector(UserDefinedType[list[float]]):
+    """pgvector column type, declared for the schema only.
+
+    Queries pass vectors as text and cast in SQL (CAST(CAST(:v AS text) AS vector)) because
+    asyncpg has no codec for the vector type; see agent/tools/search_docs.py.
+    """
+
+    cache_ok = True
+
+    def __init__(self, dim: int) -> None:
+        self.dim = dim
+
+    def get_col_spec(self, **kw: Any) -> str:
+        return f"vector({self.dim})"
+
+
+class Document(Base):
+    __tablename__ = "documents"
+    __table_args__ = (UniqueConstraint("source", "chunk"),)
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    source: Mapped[str] = mapped_column(Text)
+    chunk: Mapped[int] = mapped_column(Integer)
+    title: Mapped[str | None] = mapped_column(Text)
+    content: Mapped[str] = mapped_column(Text)
+    embedding: Mapped[list[float]] = mapped_column(Vector(768))
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
 

@@ -11,6 +11,7 @@ from dap.config import Settings
 from dap.db import repo
 from dap.db.models import JsonDict, Run
 from dap.db.repo import LeaseLostError
+from dap.engine.effects import ExternalEffect, record_once
 from dap.engine.idempotency import Effect, run_once
 from dap.engine.leases import heartbeat
 from dap.engine.queue import Claim, requeue_or_dead_letter
@@ -35,10 +36,12 @@ class StepResult:
     output: JsonDict
     next_step: StepSpec | None = None
     run_result: JsonDict | None = None
+    run_error: str | None = None
 
     def __post_init__(self) -> None:
-        if self.next_step is not None and self.run_result is not None:
-            raise ValueError("a step either schedules a next step or finishes the run")
+        endings = [self.next_step, self.run_result, self.run_error]
+        if sum(e is not None for e in endings) > 1:
+            raise ValueError("a step schedules a next step, finishes the run, or fails it")
 
 
 @dataclass(frozen=True)
@@ -49,6 +52,11 @@ class StepContext:
     async def once(self, name: str, effect: Effect) -> JsonDict:
         key = f"{self.claim.step_id}:{name}"
         return await run_once(self.sessionmaker, key, self.claim.step_id, effect)
+
+    async def external(self, name: str, effect: ExternalEffect) -> JsonDict:
+        """Slow or outside effect: at-least-once, recorded once (see engine/effects.py)."""
+        key = f"{self.claim.step_id}:{name}"
+        return await record_once(self.sessionmaker, key, self.claim.step_id, effect)
 
 
 Handler = Callable[[StepContext], Awaitable[StepResult]]
@@ -137,6 +145,10 @@ async def record_success(
             if result.next_step is not None:
                 spec = result.next_step
                 await repo.add_step(session, claim.run_id, spec.kind, spec.input, spec.max_attempts)
+            elif result.run_error is not None:
+                await repo.finish_run(
+                    session, claim.run_id, RunStatus.FAILED, error=result.run_error
+                )
             else:
                 final = result.run_result if result.run_result is not None else result.output
                 await repo.finish_run(session, claim.run_id, RunStatus.SUCCEEDED, result=final)

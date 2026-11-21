@@ -54,4 +54,5 @@ timeout = 300
 markers = [
     "integration: needs a running Postgres",
     "chaos: kills real worker processes (slow)",
+    "docker: runs the python_exec sandbox in real Docker containers",
 ]

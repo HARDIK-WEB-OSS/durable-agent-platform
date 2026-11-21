@@ -1,4 +1,5 @@
 from functools import lru_cache
+from pathlib import Path
 from typing import Literal
 
 from pydantic import Field, SecretStr
@@ -38,6 +39,25 @@ class Settings(BaseSettings):
     llm_max_retries: int = 2
     llm_price_overrides: dict[str, tuple[float, float]] = {}
     llm_shadow_anchor: str = "deepinfra/Qwen/Qwen2.5-7B-Instruct"
+
+    agent_max_steps: int = Field(default=12, gt=0)  # LLM turns per run
+    agent_timeout_seconds: float = Field(default=900.0, gt=0)  # wall clock per run
+    agent_max_tokens: int = Field(default=512, gt=0)  # per LLM turn
+    agent_max_observation_chars: int = Field(default=2000, gt=0)
+
+    # Embedding dimension is fixed by migration 0004 (vector(768)).
+    embedding_model: str = "nomic-embed-text"
+    search_top_k: int = Field(default=4, gt=0)
+
+    sql_data_dir: Path = Path("data/sql")
+    sql_timeout_seconds: float = Field(default=5.0, gt=0)
+
+    # Set false on hosts that cannot run Docker; the tool is then not offered to the model.
+    python_exec_enabled: bool = True
+    sandbox_image: str = (
+        "python:3.11-slim@sha256:07d4824036af339fa1b6ef769cc99d9c10a141769538b52b3b597c84f7a7b535"
+    )
+    sandbox_timeout_seconds: float = Field(default=10.0, gt=0)
 
     @property
     def database_url(self) -> str:
